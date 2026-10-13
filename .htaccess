@@ -1,0 +1,20 @@
+# Safety net for hosts where the web root is the project root instead of public/ (e.g. Hostinger GitHub deploys).
+# Every request is sent to public/, so nothing outside public/ (.env, vendor/, storage/, app/) can ever be served.
+# If you set the site's document root to <app-folder>/public, this file is simply never reached.
+<IfModule mod_rewrite.c>
+    RewriteEngine On
+
+    # Keep the Authorization header (Bearer tokens) when rewriting.
+    RewriteCond %{HTTP:Authorization} .
+    RewriteRule .* - [E=HTTP_AUTHORIZATION:%{HTTP:Authorization}]
+
+    # Already inside public/? leave it alone.
+    RewriteCond %{REQUEST_URI} !^/public/
+    RewriteRule ^(.*)$ public/$1 [L]
+</IfModule>
+
+# Never list directories, never expose dotfiles even if the rewrite module is unavailable.
+Options -Indexes
+<FilesMatch "^\.(?!well-known)">
+    Require all denied
+</FilesMatch>

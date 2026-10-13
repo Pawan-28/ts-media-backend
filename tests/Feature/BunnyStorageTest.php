@@ -37,6 +37,41 @@ class BunnyStorageTest extends TestCase
         });
     }
 
+    /**
+     * Every image type (article, category, advertisement) is uploaded through BunnyStorage, and its public URL is
+     * built ONLY from the configured pull zone. With the production pull zone configured, new URLs use
+     * truth-social-media.b-cdn.net and never an older pull-zone host.
+     */
+    public function test_new_uploads_use_only_the_configured_production_cdn_host(): void
+    {
+        $this->configureBunny(['pull_zone_url' => 'https://truth-social-media.b-cdn.net']);
+        $this->fakeBunny();
+        $storage = app(BunnyStorage::class);
+
+        $paths = [
+            'article' => 'articles/how-ai-tools-are-changing-the-way-people-work-in-india/d7a5747d74574ff5a3998373f6524961.jpg',
+            'category' => 'categories/0e7033d37d9f4844ade8ffbf45724a39.jpg',
+            'advertisement' => 'advertisements/47685be7391e41508d3fe1cb85477453.jpg',
+        ];
+        foreach ($paths as $kind => $path) {
+            $url = $storage->upload($path, 'BYTES', 'image/jpeg');
+            $this->assertSame('https://truth-social-media.b-cdn.net/'.$path, $url, $kind);
+            $this->assertSame('truth-social-media.b-cdn.net', parse_url($url, PHP_URL_HOST), $kind);
+            $this->assertStringNotContainsString('truth-social-images', $url, $kind);
+        }
+        // the file itself still goes to the storage API of the zone, never to the CDN host
+        Http::assertSent(fn (Request $r) => $r->method() === 'PUT' && str_starts_with($r->url(), 'https://storage.bunnycdn.com/testzone/'));
+        Http::assertNotSent(fn (Request $r) => str_contains($r->url(), 'b-cdn.net'));
+    }
+
+    public function test_pull_zone_host_comes_from_configuration_not_from_code(): void
+    {
+        foreach (['https://truth-social-media.b-cdn.net', 'https://another-zone.b-cdn.net'] as $zone) {
+            $this->configureBunny(['pull_zone_url' => $zone]);
+            $this->assertSame($zone.'/articles/a/b.jpg', app(BunnyStorage::class)->publicUrl('articles/a/b.jpg'));
+        }
+    }
+
     public function test_region_mapping(): void
     {
         foreach (['' => 'storage.bunnycdn.com', 'storage' => 'storage.bunnycdn.com', 'de' => 'storage.bunnycdn.com', 'falkenstein' => 'storage.bunnycdn.com', 'ny' => 'ny.storage.bunnycdn.com', 'SG' => 'sg.storage.bunnycdn.com'] as $region => $host) {
@@ -47,7 +82,7 @@ class BunnyStorageTest extends TestCase
 
     public function test_only_hostname_of_pull_zone_is_lowercased(): void
     {
-        $this->assertSame('https://truth-social-images-cdn.b-cdn.net', BunnyStorage::normalizePullZone('https://Truth-Social-IMAGES-CDN.b-cdn.net/'));
+        $this->assertSame('https://truth-social-media.b-cdn.net', BunnyStorage::normalizePullZone('https://Truth-Social-MEDIA.b-cdn.net/'));
         $this->assertSame('https://cdn.example.com:8443/Media/Path', BunnyStorage::normalizePullZone('https://CDN.Example.com:8443/Media/Path/'));
         $this->assertSame('https://host.b-cdn.net', BunnyStorage::normalizePullZone('Host.b-cdn.net'));
         $this->assertSame('', BunnyStorage::normalizePullZone(''));
