@@ -27,6 +27,7 @@ class SecurityHardeningTest extends TestCase
     private const PUBLIC = [
         'GET api/health', 'GET api/advertisements/active', 'GET api/articles', 'GET api/articles/{slug}',
         'GET api/articles/{slug}/images', 'GET api/articles/{slug}/images/{image}', 'GET api/articles/{slug}/related',
+        'GET api/articles/{slug}/comments', 'GET api/videos/active',
         'GET api/categories', 'GET api/categories/{slug}', 'GET api/industries', 'GET api/industries/{slug}',
         'GET api/subcategories', 'GET api/subcategories/{id}', 'GET api/tags', 'GET api/tags/{slug}',
         'GET api/search', 'GET api/subscriptions/plans',
