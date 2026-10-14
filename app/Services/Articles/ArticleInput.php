@@ -5,7 +5,6 @@ namespace App\Services\Articles;
 use App\Enums\AccessLevel;
 use App\Enums\ArticleStatus;
 use App\Models\Article;
-use App\Models\ReporterCategoryAssignment;
 use App\Models\Subcategory;
 use App\Models\Tag;
 use App\Models\User;
@@ -89,18 +88,6 @@ class ArticleInput
         }
 
         $f->throwIfFailed();
-
-        // Reporter category enforcement (Django validate()): only when a subcategory is being set.
-        if ($subcategory && $actor->isReporter()) {
-            $allowed = ReporterCategoryAssignment::query()
-                ->where('reporter_id', $actor->id)
-                ->where('category_id', $subcategory->category_id)
-                ->exists();
-            if (! $allowed) {
-                $f->error('subcategory_slug', 'You are not assigned to the category this subcategory belongs to. Ask an administrator to assign you to it first.');
-                $f->throwIfFailed();
-            }
-        }
 
         $attrs = $f->validated();
         unset($attrs['status'], $attrs['slug'], $attrs['subcategory_slug']);

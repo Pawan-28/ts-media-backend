@@ -9,7 +9,6 @@ use App\Models\ArticleDailyView;
 use App\Models\Notification;
 use App\Models\PlagiarismCheckResult;
 use App\Models\PublishingSchedule;
-use App\Models\ReporterCategoryAssignment;
 use App\Models\Subscription;
 use App\Models\Tag;
 use App\Models\User;
@@ -60,7 +59,6 @@ class QualityGuardsTest extends TestCase
             Notification::query()->create(['recipient_id' => $reporter->id, 'article_id' => $a->id, 'notification_type' => 'ARTICLE_PUBLISHED', 'message' => 'm', 'is_read' => false]);
             $articles[] = $a;
         }
-        ReporterCategoryAssignment::query()->create(['reporter_id' => $reporter->id, 'category_id' => $t['category']->id, 'assigned_by_id' => $admin->id]);
         $planSub = SubscriptionFactory::new()->active()->create();
         PaymentFactory::new()->forSubscription($planSub)->create();
         AdvertisementFactory::new()->create();
@@ -77,7 +75,7 @@ class QualityGuardsTest extends TestCase
             [null, '/api/categories/'], [null, '/api/subcategories/'], [null, '/api/industries/'], [null, '/api/tags/'],
             [$reporter, '/api/notifications/'], [$admin, '/api/notifications/admin/'],
             [$admin, '/api/accounts/users/'], [$admin, '/api/accounts/security/outstanding-tokens/'],
-            [$admin, '/api/reporters/assignments/'], [$admin, '/api/reporters/schedules/'],
+            [$admin, '/api/reporters/schedules/'],
             [$admin, '/api/subscriptions/admin/list/'], [$admin, '/api/subscriptions/admin/payments/'],
             [$admin, '/api/subscriptions/admin/otps/'], [$admin, '/api/advertisements/'], [null, '/api/advertisements/active/'],
             [$admin, '/api/ai/analysis-results/'], [$admin, '/api/ai/plagiarism-results/'],

@@ -4,7 +4,6 @@ namespace Tests\Feature\Workflow;
 
 use App\Enums\ArticleStatus as S;
 use App\Models\Article;
-use App\Models\ReporterCategoryAssignment;
 use Database\Factories\CategoryFactory;
 use Database\Factories\SubcategoryFactory;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -110,25 +109,19 @@ class ReporterFlowTest extends TestCase
         $this->assertLessThan(25, count(DB::getQueryLog()));
     }
 
-    // ---------------------------------------------------- reporter category assignment enforcement
+    // ---------------------------------------------------- reporters are not tied to categories any more
 
-    public function test_assignment_requires_active_reporter_category_assignment_at_the_time(): void
+    public function test_a_reporter_can_be_assigned_to_an_article_in_any_category(): void
     {
         $a = $this->article();
-        ReporterCategoryAssignment::where('reporter_id', $this->assignee->id)->delete();
-        $r = $this->act($this->admin, $a->slug, 'assign-reporter', ['reporter_id' => $this->assignee->id])->assertStatus(400);
-        $this->assertStringContainsString($this->category->name, $r->json('reporter'));
-        $this->assertStringContainsString('is not assigned to the', $r->json('reporter'));
-
-        ReporterCategoryAssignment::create(['reporter_id' => $this->assignee->id, 'category_id' => $this->category->id]);
-        $this->act($this->admin, $a->slug, 'assign-reporter', ['reporter_id' => $this->assignee->id])->assertOk();
+        $this->act($this->admin, $a->slug, 'assign-reporter', ['reporter_id' => $this->otherReporter->id])->assertOk();
     }
 
-    public function test_reporter_assigned_to_another_category_cannot_be_assigned(): void
+    public function test_assignment_works_for_an_article_in_a_different_category(): void
     {
         $sub2 = SubcategoryFactory::new()->create(['category_id' => CategoryFactory::new()->create()->id]);
         $a = $this->article(S::DRAFT, ['subcategory_id' => $sub2->id]);
-        $this->act($this->admin, $a->slug, 'assign-reporter', ['reporter_id' => $this->assignee->id])->assertStatus(400)->assertJsonStructure(['reporter']);
+        $this->act($this->admin, $a->slug, 'assign-reporter', ['reporter_id' => $this->assignee->id])->assertOk();
     }
 
     public function test_inactive_reporter_cannot_be_assigned(): void

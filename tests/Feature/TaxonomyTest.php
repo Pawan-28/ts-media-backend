@@ -5,7 +5,6 @@ namespace Tests\Feature;
 use App\Models\Article;
 use App\Models\Category;
 use App\Models\Industry;
-use App\Models\ReporterCategoryAssignment;
 use App\Models\Subcategory;
 use App\Models\Tag;
 use App\Models\User;
@@ -256,15 +255,11 @@ class TaxonomyTest extends TestCase
         $this->assertDatabaseHas('industries', ['id' => $t['industry']->id]);
     }
 
-    public function test_category_with_subcategories_articles_or_assignments_cannot_be_deleted(): void
+    public function test_category_with_subcategories_or_articles_cannot_be_deleted(): void
     {
         $admin = User::factory()->admin()->create();
         $t = $this->tree();
         $this->as($admin)->deleteJson('/api/categories/'.$t['category']->slug.'/')->assertStatus(409)->assertJsonStructure(['detail']);
-
-        $onlyAssignments = Category::factory()->create(['industry_id' => $t['industry']->id]);
-        ReporterCategoryAssignment::query()->create(['reporter_id' => User::factory()->reporter()->create()->id, 'category_id' => $onlyAssignments->id]);
-        $this->as($admin)->deleteJson('/api/categories/'.$onlyAssignments->slug.'/')->assertStatus(409);
 
         // legacy article that only has the category (no subcategory) still blocks it
         $legacy = Category::factory()->create(['industry_id' => $t['industry']->id]);

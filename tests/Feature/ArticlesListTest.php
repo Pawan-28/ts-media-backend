@@ -52,7 +52,8 @@ class ArticlesListTest extends TestCase
         }
         $this->assertSame($t['category']->slug, $item['subcategory']['category']['slug']);
         $this->assertSame($t['industry']->slug, $item['subcategory']['category']['industry']['slug']);
-        $this->assertSame(['id', 'email', 'first_name', 'last_name', 'full_name'], array_keys($item['author']));
+        // 'bio' is the public "About the Author" blurb added to the author object.
+        $this->assertSame(['id', 'email', 'first_name', 'last_name', 'full_name', 'bio'], array_keys($item['author']));
     }
 
     public function test_visibility_by_role(): void

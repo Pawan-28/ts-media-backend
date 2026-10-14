@@ -11,7 +11,6 @@ use App\Jobs\NotifySubscribersOfArticle;
 use App\Models\Article;
 use App\Models\ArticleReview;
 use App\Models\PublishingSchedule;
-use App\Models\ReporterCategoryAssignment;
 use App\Models\User;
 use App\Services\NotificationService;
 use App\Support\DateRange;
@@ -269,7 +268,7 @@ class ArticleWorkflowService
 
     /**
      * Admin: route an article to a reporter for review/edit (DRAFT|SUBMITTED|UNDER_REVIEW -> UNDER_REVIEW).
-     * The reporter must hold a ReporterCategoryAssignment for the article's category and must not be its author.
+     * The assignee must be an active Reporter and must not be the article's author (no category assignment is required).
      */
     public function assignReporter(Article $article, User $actor, User $reporter): Article
     {
@@ -290,21 +289,6 @@ class ArticleWorkflowService
             if ($reporter->id === $a->author_id) {
                 throw WorkflowException::field('reporter', "The assigned reporter cannot be the article's author.");
             }
-            $a->loadMissing('subcategory.category', 'legacyCategory');
-            $category = $a->effective_category;
-            if ($category === null) {
-                throw WorkflowException::field('reporter', 'This article has no Category/Subcategory yet - classify it before assigning a reporter.');
-            }
-            $eligible = ReporterCategoryAssignment::query()
-                ->where('reporter_id', $reporter->id)->where('category_id', $category->id)->exists();
-            if (! $eligible) {
-                throw WorkflowException::field('reporter', sprintf(
-                    "%s is not assigned to the '%s' category this article belongs to. Assign them to that category first (Reporter Category Assignment) or choose a different reporter.",
-                    $reporter->email,
-                    $category->name,
-                ));
-            }
-
             // A DRAFT stays a DRAFT: assigning only records the reporter. The admin then chooses
             // Move to Under Review (or Publish / Schedule / Reject) from the workflow buttons.
             $staysDraft = $from === ArticleStatus::DRAFT;

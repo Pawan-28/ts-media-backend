@@ -5,7 +5,6 @@ namespace Tests\Feature;
 use App\Enums\ArticleStatus;
 use App\Events\ArticleViewed;
 use App\Models\Article;
-use App\Models\ReporterCategoryAssignment;
 use App\Models\Subcategory;
 use App\Models\Tag;
 use App\Models\User;
@@ -30,10 +29,7 @@ class ArticlesCrudTest extends TestCase
 
     private function reporterFor(Subcategory $sub): User
     {
-        $r = User::factory()->reporter()->create();
-        ReporterCategoryAssignment::query()->create(['reporter_id' => $r->id, 'category_id' => $sub->category_id]);
-
-        return $r;
+        return User::factory()->reporter()->create();
     }
 
     // ---- create -----------------------------------------------------------
@@ -91,25 +87,27 @@ class ArticlesCrudTest extends TestCase
         $this->assertDatabaseCount('articles', 1);
     }
 
-    public function test_reporter_needs_a_category_assignment_for_the_subcategory(): void
+    public function test_reporter_can_use_any_category_and_subcategory_without_any_assignment(): void
     {
         $t = $this->tree();
         $other = $this->tree();
-        $reporter = $this->reporterFor($t['subcategory']);
-        $msg = 'You are not assigned to the category this subcategory belongs to. Ask an administrator to assign you to it first.';
-        $this->as($reporter)->postJson('/api/articles/', $this->payload($other['subcategory']))->assertStatus(400)->assertExactJson(['subcategory_slug' => [$msg]]);
-        $this->as(User::factory()->reporter()->create())->postJson('/api/articles/', $this->payload($t['subcategory']))->assertStatus(400)->assertJsonPath('subcategory_slug.0', $msg);
-        $this->as($reporter)->postJson('/api/articles/', $this->payload($t['subcategory']))->assertCreated();
-        // admin bypasses the assignment rule
+        $sibling = Subcategory::factory()->create(['category_id' => $t['category']->id]);
+        $reporter = User::factory()->reporter()->create();
+        // Category assignments no longer exist: a plain reporter may file under any category/subcategory.
+        foreach ([$t['subcategory'], $sibling, $other['subcategory']] as $sub) {
+            $this->as($reporter)->postJson('/api/articles/', $this->payload($sub))->assertCreated();
+        }
         $this->as(User::factory()->admin()->create())->postJson('/api/articles/', $this->payload($other['subcategory']))->assertCreated();
     }
 
-    public function test_assignment_is_category_level_so_any_subcategory_under_it_works(): void
+    public function test_reporter_can_move_their_own_draft_to_another_category(): void
     {
         $t = $this->tree();
-        $sibling = Subcategory::factory()->create(['category_id' => $t['category']->id]);
-        $reporter = $this->reporterFor($t['subcategory']);
-        $this->as($reporter)->postJson('/api/articles/', $this->payload($sibling))->assertCreated();
+        $other = $this->tree();
+        $reporter = User::factory()->reporter()->create();
+        $slug = $this->as($reporter)->postJson('/api/articles/', $this->payload($t['subcategory']))->assertCreated()->json('slug');
+        $this->as($reporter)->patchJson("/api/articles/{$slug}/", ['subcategory_slug' => $other['subcategory']->slug])->assertOk();
+        $this->assertSame($other['subcategory']->id, Article::query()->where('slug', $slug)->firstOrFail()->subcategory_id);
     }
 
     public function test_required_fields_and_messages(): void
@@ -314,16 +312,6 @@ class ArticlesCrudTest extends TestCase
         // plain users / guests
         $this->as(User::factory()->create())->patchJson("/api/articles/{$pub->slug}/", ['title' => 'x'])->assertStatus(403);
         $this->as(null)->patchJson("/api/articles/{$pub->slug}/", ['title' => 'x'])->assertStatus(401);
-    }
-
-    public function test_reporter_moving_an_article_to_an_unassigned_category_is_rejected(): void
-    {
-        $t = $this->tree();
-        $other = $this->tree();
-        $reporter = $this->reporterFor($t['subcategory']);
-        $article = Article::factory()->create(['author_id' => $reporter->id, 'subcategory_id' => $t['subcategory']->id]);
-        $this->as($reporter)->patchJson("/api/articles/{$article->slug}/", ['subcategory_slug' => $other['subcategory']->slug])->assertStatus(400)->assertJsonStructure(['subcategory_slug']);
-        $this->assertSame($t['subcategory']->id, $article->fresh()->subcategory_id);
     }
 
     public function test_reporter_may_set_access_level_but_never_status(): void

@@ -100,9 +100,4 @@ class User extends Authenticatable
     {
         return $this->hasMany(Subscription::class);
     }
-
-    public function categoryAssignments(): HasMany
-    {
-        return $this->hasMany(ReporterCategoryAssignment::class, 'reporter_id');
-    }
 }

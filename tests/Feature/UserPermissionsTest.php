@@ -226,16 +226,49 @@ class UserPermissionsTest extends TestCase
         $this->as($this->plainUser)->getJson('/api/notifications/admin/')->assertOk();
     }
 
-    public function test_reporter_assignments_and_schedules_permissions(): void
+    public function test_reporter_schedules_permission(): void
     {
-        $this->as($this->author)->getJson('/api/reporters/assignments/')->assertForbidden();
-        $this->as($this->author)->getJson('/api/reporters/schedules/')->assertForbidden();
-        $this->grant($this->author, ['reporters.manage']);
-        $this->as($this->author)->getJson('/api/reporters/assignments/')->assertOk();
         $this->as($this->author)->getJson('/api/reporters/schedules/')->assertForbidden();
         $this->grant($this->author, ['articles.publish']);
         $this->as($this->author)->getJson('/api/reporters/schedules/')->assertOk();
-        $this->as($this->author)->getJson('/api/reporters/assignments/')->assertForbidden();
+    }
+
+    public function test_reporter_category_assignments_are_gone(): void
+    {
+        $this->assertFalse(Permissions::exists('reporters.manage'));
+        $this->assertNotContains('reporters.manage', Permissions::keys());
+        // a stale stored key is ignored, never granted, and never breaks the account
+        $u = $this->grant($this->author, ['reporters.manage', 'ads.manage']);
+        $this->assertSame(['ads.manage'], $u->effectivePermissions());
+        $this->as($this->admin)->getJson('/api/reporters/assignments/')->assertNotFound();
+        $this->as($this->admin)->postJson('/api/reporters/assignments/', ['reporter' => $this->author->id, 'category' => $this->category->id])->assertNotFound();
+    }
+
+    public function test_manage_all_articles_lets_a_reporter_work_in_any_category_without_publish_rights(): void
+    {
+        $other = $this->tree();
+        $payload = ['title' => 'Cross category', 'content' => '<p>Body</p>', 'subcategory_slug' => $other['subcategory']->slug];
+        $manager = $this->grant($this->otherReporter, ['articles.manage']);
+
+        $slug = $this->as($manager)->postJson('/api/articles/', $payload)->assertCreated()->json('slug');
+        // can edit someone else's article in any category (articles.manage) ...
+        $theirs = $this->article(S::DRAFT, ['author_id' => $this->author->id]);
+        $this->as($manager)->patchJson("/api/articles/{$theirs->slug}/", ['title' => 'Edited by manager'])->assertOk();
+        $this->as($manager)->patchJson("/api/articles/{$slug}/", ['subcategory_slug' => $this->subcategory->slug])->assertOk();
+        // ... but it does NOT silently grant publishing or scheduling
+        $this->assertFalse($manager->canPublishArticles());
+        $this->as($manager)->postJson("/api/articles/{$slug}/publish/")->assertForbidden();
+    }
+
+    public function test_a_plain_reporter_keeps_the_ownership_rules_in_any_category(): void
+    {
+        $other = $this->tree();
+        $payload = ['title' => 'Mine', 'content' => '<p>Body</p>', 'subcategory_slug' => $other['subcategory']->slug];
+        $this->as($this->otherReporter)->postJson('/api/articles/', $payload)->assertCreated();
+        // someone else's draft is still invisible/off limits without articles.manage (existing ownership rule: 404)
+        $theirs = $this->article(S::DRAFT, ['author_id' => $this->author->id]);
+        $this->as($this->otherReporter)->patchJson("/api/articles/{$theirs->slug}/", ['title' => 'Nope'])->assertNotFound();
+        $this->assertNotSame('Nope', $theirs->fresh()->title);
     }
 
     public function test_taxonomy_permission(): void

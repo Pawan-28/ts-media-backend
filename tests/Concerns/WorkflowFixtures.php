@@ -5,7 +5,6 @@ namespace Tests\Concerns;
 use App\Enums\ArticleStatus;
 use App\Models\Article;
 use App\Models\Category;
-use App\Models\ReporterCategoryAssignment;
 use App\Models\Subcategory;
 use App\Models\User;
 use Database\Factories\CategoryFactory;
@@ -42,9 +41,6 @@ trait WorkflowFixtures
 
         $this->category = CategoryFactory::new()->create();
         $this->subcategory = SubcategoryFactory::new()->create(['category_id' => $this->category->id]);
-        foreach ([$this->author, $this->assignee] as $r) {
-            ReporterCategoryAssignment::create(['reporter_id' => $r->id, 'category_id' => $this->category->id, 'assigned_by_id' => $this->admin->id]);
-        }
     }
 
     protected function article(ArticleStatus $status = ArticleStatus::DRAFT, array $attrs = []): Article

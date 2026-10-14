@@ -7,7 +7,6 @@ use App\Jobs\ReindexArticleSearch;
 use App\Models\Article;
 use App\Models\Category;
 use App\Models\Industry;
-use App\Models\ReporterCategoryAssignment;
 use App\Support\DrfFields;
 use App\Support\Slug;
 use Illuminate\Database\Eloquent\Builder;
@@ -72,9 +71,6 @@ class CategoryController extends TaxonomyController
         }
         if (($n = Article::query()->where('category_id', $m->id)->count()) > 0) {
             $parts[] = $n.' article'.($n === 1 ? '' : 's');
-        }
-        if (($n = ReporterCategoryAssignment::query()->where('category_id', $m->id)->count()) > 0) {
-            $parts[] = $n.' reporter assignment'.($n === 1 ? '' : 's');
         }
 
         return $parts ? implode(', ', $parts) : null;

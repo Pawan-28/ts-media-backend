@@ -9,7 +9,6 @@ use App\Models\Article;
 use App\Models\ArticleReview;
 use App\Models\Notification;
 use App\Models\PublishingSchedule;
-use App\Models\ReporterCategoryAssignment;
 use App\Models\User;
 use App\Services\NotificationService;
 use App\Services\Workflow\ArticleWorkflowService;
@@ -320,30 +319,27 @@ class WorkflowActionsTest extends TestCase
     public function test_reassign_writes_reassigned_row_and_keeps_status(): void
     {
         $other = User::factory()->reporter()->create();
-        ReporterCategoryAssignment::create(['reporter_id' => $other->id, 'category_id' => $this->category->id]);
         $a = $this->article(S::UNDER_REVIEW, ['assigned_reporter_id' => $this->assignee->id]);
         $this->act($this->admin, $a->slug, 'assign-reporter', ['reporter_id' => $other->id])->assertOk()->assertJsonPath('assigned_reporter.id', $other->id);
         $this->assertSame("Reassigned to reporter {$other->email} for review.", $this->lastReview($a)->reason);
         $this->assertSame(S::UNDER_REVIEW, $this->statusOf($a));
     }
 
-    public function test_cannot_assign_non_reporter_unassigned_category_reporter_or_the_author(): void
+    public function test_cannot_assign_a_non_reporter_or_the_author(): void
     {
         $a = $this->article();
         $this->act($this->admin, $a->slug, 'assign-reporter', ['reporter_id' => $this->plainUser->id])->assertStatus(400)
             ->assertExactJson(['reporter' => 'The assigned user must be a Reporter (role=REPORTER).']);
-        $this->act($this->admin, $a->slug, 'assign-reporter', ['reporter_id' => $this->otherReporter->id])->assertStatus(400)
-            ->assertJsonStructure(['reporter']);
         $this->act($this->admin, $a->slug, 'assign-reporter', ['reporter_id' => $this->author->id])->assertStatus(400)
             ->assertExactJson(['reporter' => "The assigned reporter cannot be the article's author."]);
         $this->assertSame(S::DRAFT, $this->statusOf($a));
         $this->assertNull($a->fresh()->assigned_reporter_id);
     }
 
-    public function test_cannot_assign_when_article_has_no_category(): void
+    public function test_can_assign_a_reporter_even_when_the_article_has_no_category_yet(): void
     {
         $a = $this->article(S::DRAFT, ['subcategory_id' => null, 'category_id' => null]);
-        $this->act($this->admin, $a->slug, 'assign-reporter', ['reporter_id' => $this->assignee->id])->assertStatus(400)->assertJsonStructure(['reporter']);
+        $this->act($this->admin, $a->slug, 'assign-reporter', ['reporter_id' => $this->assignee->id])->assertOk();
     }
 
     // ------------------------------------------------------------------ service: changeStatus (the PATCH bypass is gone)

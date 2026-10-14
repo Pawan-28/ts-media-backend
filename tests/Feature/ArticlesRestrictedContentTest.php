@@ -4,7 +4,6 @@ namespace Tests\Feature;
 
 use App\Enums\AccessLevel;
 use App\Models\Article;
-use App\Models\ReporterCategoryAssignment;
 use App\Models\Subscription;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -96,7 +95,6 @@ class ArticlesRestrictedContentTest extends TestCase
     {
         $author = User::factory()->reporter()->create();
         $t = $this->tree();
-        ReporterCategoryAssignment::query()->create(['reporter_id' => $author->id, 'category_id' => $t['category']->id]);
         $a = $this->locked($level, ['author_id' => $author->id, 'subcategory_id' => $t['subcategory']->id, 'status' => 'DRAFT', 'published_at' => null]);
 
         $mine = $this->as($author)->getJson('/api/articles/mine/')->assertOk();

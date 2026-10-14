@@ -2,7 +2,6 @@
 
 use App\Http\Controllers\Api\Workflow\ArticleWorkflowController;
 use App\Http\Controllers\Api\Workflow\PublishingScheduleController;
-use App\Http\Controllers\Api\Workflow\ReporterAssignmentController;
 use Illuminate\Support\Facades\Route;
 
 /*
@@ -28,13 +27,5 @@ Route::middleware('api.auth')->group(function () use ($slug) {
 
     Route::prefix('reporters')->group(function () {
         Route::get('schedules', [PublishingScheduleController::class, 'index'])->middleware('perm:articles.publish');
-
-        Route::middleware('perm:reporters.manage')->group(function () {
-            Route::get('assignments', [ReporterAssignmentController::class, 'index']);
-            Route::post('assignments', [ReporterAssignmentController::class, 'store']);
-            Route::get('assignments/{id}', [ReporterAssignmentController::class, 'show'])->whereNumber('id');
-            Route::match(['put', 'patch'], 'assignments/{id}', [ReporterAssignmentController::class, 'update'])->whereNumber('id');
-            Route::delete('assignments/{id}', [ReporterAssignmentController::class, 'destroy'])->whereNumber('id');
-        });
     });
 });
