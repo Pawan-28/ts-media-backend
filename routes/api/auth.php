@@ -11,6 +11,7 @@ Route::prefix('auth')->group(function () {
     Route::middleware('api.auth')->group(function () {
         Route::post('logout', [AuthController::class, 'logout']);
         Route::get('me', [AuthController::class, 'me']);
+        Route::match(['put', 'patch'], 'me', [AuthController::class, 'updateMe'])->middleware('throttle:30,1');
     });
 });
 

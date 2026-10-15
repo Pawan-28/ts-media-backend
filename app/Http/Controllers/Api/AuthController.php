@@ -123,6 +123,44 @@ class AuthController extends Controller
         return (new UserResource($request->user()))->response();
     }
 
+    /**
+     * PATCH /auth/me/ - a signed-in user edits THEIR OWN profile: first/last name for everyone, and the public
+     * "About the Author" bio for reporters and admins (the only roles that author articles). Email, role,
+     * permissions and active state are never accepted here (login identity / privileges stay admin-managed), and a
+     * phone number is changed only through the OTP verification flow.
+     */
+    public function updateMe(Request $request): JsonResponse
+    {
+        $user = $request->user();
+        $data = $request->validate([
+            'first_name' => ['sometimes', 'nullable', 'string', 'max:150'],
+            'last_name' => ['sometimes', 'nullable', 'string', 'max:150'],
+            'bio' => ['sometimes', 'nullable', 'string', 'max:1000'],
+        ]);
+
+        $clean = fn ($v) => trim(strip_tags((string) ($v ?? '')));
+
+        if (array_key_exists('bio', $data) && $clean($data['bio']) !== '' && ! in_array($user->role, [Role::ADMIN, Role::REPORTER], true)) {
+            throw ValidationException::withMessages(['bio' => ['Only reporters and administrators can add an author bio.']]);
+        }
+
+        $first = array_key_exists('first_name', $data) ? $clean($data['first_name']) : (string) $user->first_name;
+        $last = array_key_exists('last_name', $data) ? $clean($data['last_name']) : (string) $user->last_name;
+        if ($first === '' && $last === '') {
+            throw ValidationException::withMessages(['first_name' => ['Please enter your name.']]);
+        }
+
+        $user->first_name = $first;
+        $user->last_name = $last;
+        if (array_key_exists('bio', $data)) {
+            $bio = $clean($data['bio']);
+            $user->bio = $bio !== '' ? $bio : null;
+        }
+        $user->save();
+
+        return (new UserResource($user->refresh()))->response();
+    }
+
     public static function normalizeEmail(string $email): string
     {
         [$local, $domain] = array_pad(explode('@', trim($email), 2), 2, '');
